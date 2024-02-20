@@ -10,6 +10,7 @@ import (
 	"sync"
 	_ "time"
 	"syscall"
+	"strings"
 )
 
 var Targets = make([]FileEntry,0)
@@ -29,6 +30,9 @@ type FileEntry struct {
 
 func visitCallback(path string, d fs.DirEntry, err error) error {
 	if err != nil {
+		return fs.SkipDir
+	}
+	if strings.HasPrefix(path,"/dev/tty"){
 		return fs.SkipDir
 	}
 	if !d.IsDir() {
@@ -59,29 +63,36 @@ func loop(id int, wg *sync.WaitGroup){
 		writeCount := rand.Intn(len(Buffer))
 		target := Targets[index]
 		fmt.Printf("[+] FUZZING %s\n",target.Name)
+
 		if (target.CanRead){
-			rptr, err := os.OpenFile(target.Name,os.O_RDONLY,0)
-			if err != nil {
-				continue
+			rptr, err := os.OpenFile(target.Name, os.O_RDONLY,0)
+			if err == nil {
+				nread, _ := rptr.Read(Buffer[0:readCount])
+				fmt.Printf("read %d\n",nread)
+				for i := 0x0; i < 0xffff; i++ {
+					_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(rptr.Fd()), uintptr(i), uintptr(0))
+					if errno == 0 {
+						fmt.Printf("IOCTL WORKED %x\n",i)
+					}
+				}
+				rptr.Close()
 			}
-			rptr.Read(Buffer[0:readCount])
-			for i := 0x0; i < 0xffff; i++ {
-				_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, uintptr(rptr.Fd()), uintptr(i), uintptr(0))
-			}
-			rptr.Close()
-		}
-		if (target.CanWrite){
-			wptr, err := os.OpenFile(target.Name,os.O_WRONLY,0)
-			if err != nil {
-				continue
-			}
-			wptr.Write(Buffer[0:writeCount])
-			for i := 0x0; i < 0xffff; i++ {
-				_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, uintptr(wptr.Fd()), uintptr(i), uintptr(0))
-			}
-			wptr.Close()
 		}
 
+		if (target.CanWrite){
+			wptr, err := os.OpenFile(target.Name, os.O_WRONLY,0)
+			if err == nil {
+				nwrote, _ := wptr.Write(Buffer[0:writeCount])
+				fmt.Printf("wrote %d\n",nwrote)
+				for i := 0x0; i < 0xffff; i++ {
+					_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(wptr.Fd()), uintptr(i), uintptr(0))
+					if errno == 0 {
+						fmt.Printf("IOCTL WORKED %x\n",i)
+					}
+				}
+				wptr.Close()
+			}
+		}
 	}
 	//time.Sleep(10 * time.Second)
 	//fmt.Println("Worker End ",id)
