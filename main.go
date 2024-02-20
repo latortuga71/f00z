@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"sync"
 	_ "time"
+	"syscall"
 )
 
 var Targets = make([]FileEntry,0)
@@ -57,13 +58,16 @@ func loop(id int, wg *sync.WaitGroup){
 		readCount := rand.Intn(len(Buffer))
 		writeCount := rand.Intn(len(Buffer))
 		target := Targets[index]
-		fmt.Println(index,target,readCount,writeCount)
+		fmt.Printf("[+] FUZZING %s\n",target.Name)
 		if (target.CanRead){
 			rptr, err := os.OpenFile(target.Name,os.O_RDONLY,0)
 			if err != nil {
 				continue
 			}
 			rptr.Read(Buffer[0:readCount])
+			for i := 0x0; i < 0xffff; i++ {
+				_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, uintptr(rptr.Fd()), uintptr(i), uintptr(0))
+			}
 			rptr.Close()
 		}
 		if (target.CanWrite){
@@ -72,8 +76,12 @@ func loop(id int, wg *sync.WaitGroup){
 				continue
 			}
 			wptr.Write(Buffer[0:writeCount])
+			for i := 0x0; i < 0xffff; i++ {
+				_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, uintptr(wptr.Fd()), uintptr(i), uintptr(0))
+			}
 			wptr.Close()
 		}
+
 	}
 	//time.Sleep(10 * time.Second)
 	//fmt.Println("Worker End ",id)
@@ -84,10 +92,10 @@ func loop(id int, wg *sync.WaitGroup){
 func main(){
 	var wg sync.WaitGroup
 	rand.Seed(0x41)
-	filepath.WalkDir("/",visitCallback)
-	//fmt.Println(Targets)
+	filepath.WalkDir("/dev",visitCallback)
+	filepath.WalkDir("/sys",visitCallback)
 	fmt.Println("[+] Done Gathering Targets ")
-	for id := 1; id < 256; id++ {
+	for id := 1; id < 2; id++ {
 		wg.Add(1)
 		go loop(id, &wg)
 	}
