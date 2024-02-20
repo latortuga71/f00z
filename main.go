@@ -50,7 +50,7 @@ func loop(id int, wg *sync.WaitGroup){
 		fmt.Printf("[+] FUZZING %s\n",target.Name)
 		rptr, err := os.OpenFile(target.Name, os.O_RDONLY,0)
 		if err == nil {
-			nread, _ := rptr.Read(Buffer[0:readCount])
+			rptr.Read(Buffer[0:readCount])
 			for i := 0x0; i < 0xffff; i++ {
 				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(rptr.Fd()), uintptr(i), uintptr(0))
 				if errno == 0 {
@@ -61,8 +61,7 @@ func loop(id int, wg *sync.WaitGroup){
 		}
 		wptr, err := os.OpenFile(target.Name, os.O_WRONLY,0)
 		if err == nil {
-			nwrote, _ := wptr.Write(Buffer[0:writeCount])
-			fmt.Printf("wrote %d\n",nwrote)
+			wptr.Write(Buffer[0:writeCount])
 			for i := 0x0; i < 0xffff; i++ {
 				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(wptr.Fd()), uintptr(i), uintptr(0))
 				if errno == 0 {
@@ -82,9 +81,9 @@ func main(){
 	var wg sync.WaitGroup
 	rand.Seed(0x41)
 	filepath.WalkDir("/dev",visitCallback)
-	//filepath.WalkDir("/sys",visitCallback)
+	filepath.WalkDir("/sys",visitCallback)
 	fmt.Println("[+] Done Gathering Targets ")
-	for id := 1; id < 10; id++ {
+	for id := 1; id < 2; id++ {
 		wg.Add(1)
 		go loop(id, &wg)
 	}
