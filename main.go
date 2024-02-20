@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"bytes"
 	"sync"
-	_ "time"
 	"syscall"
 	"strings"
 )
@@ -24,8 +23,7 @@ type Fuzzer struct {
 
 type FileEntry struct {
 	Name string
-	CanRead bool
-	CanWrite bool
+	ValidIoctl []int
 }
 
 func visitCallback(path string, d fs.DirEntry, err error) error {
@@ -36,62 +34,42 @@ func visitCallback(path string, d fs.DirEntry, err error) error {
 		return fs.SkipDir
 	}
 	if !d.IsDir() {
-		entry := FileEntry{ Name:path, CanRead:false, CanWrite:false}
-		// append to lsit
-		rptr, err := os.OpenFile(path,os.O_RDONLY,0)
-		if err != nil {
-			entry.CanRead = true
-		}
-		rptr.Close()
-		wptr, err := os.OpenFile(path,os.O_WRONLY,0)
-		if err != nil {
-			entry.CanWrite = true
-		}
-		wptr.Close()
-		if entry.CanRead || entry.CanWrite {
-			Targets = append(Targets,entry)
-		}
+		entry := FileEntry{Name:path}
+		Targets = append(Targets,entry)
 	}
 	return nil
 }
 
 func loop(id int, wg *sync.WaitGroup){
 	//fmt.Println("Worker Start ",id)
-	for {
-		index := rand.Intn(len(Targets))
+	for x := 0; x < len(Targets); x++ {
+		index := x
 		readCount := rand.Intn(len(Buffer))
 		writeCount := rand.Intn(len(Buffer))
 		target := Targets[index]
 		fmt.Printf("[+] FUZZING %s\n",target.Name)
-
-		if (target.CanRead){
-			rptr, err := os.OpenFile(target.Name, os.O_RDONLY,0)
-			if err == nil {
-				nread, _ := rptr.Read(Buffer[0:readCount])
-				fmt.Printf("read %d\n",nread)
-				for i := 0x0; i < 0xffff; i++ {
-					_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(rptr.Fd()), uintptr(i), uintptr(0))
-					if errno == 0 {
-						fmt.Printf("IOCTL WORKED %x\n",i)
-					}
+		rptr, err := os.OpenFile(target.Name, os.O_RDONLY,0)
+		if err == nil {
+			nread, _ := rptr.Read(Buffer[0:readCount])
+			for i := 0x0; i < 0xffff; i++ {
+				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(rptr.Fd()), uintptr(i), uintptr(0))
+				if errno == 0 {
+					fmt.Printf("IOCTL WORKED %x\n",i)
 				}
-				rptr.Close()
 			}
+			rptr.Close()
 		}
-
-		if (target.CanWrite){
-			wptr, err := os.OpenFile(target.Name, os.O_WRONLY,0)
-			if err == nil {
-				nwrote, _ := wptr.Write(Buffer[0:writeCount])
-				fmt.Printf("wrote %d\n",nwrote)
-				for i := 0x0; i < 0xffff; i++ {
-					_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(wptr.Fd()), uintptr(i), uintptr(0))
-					if errno == 0 {
-						fmt.Printf("IOCTL WORKED %x\n",i)
-					}
+		wptr, err := os.OpenFile(target.Name, os.O_WRONLY,0)
+		if err == nil {
+			nwrote, _ := wptr.Write(Buffer[0:writeCount])
+			fmt.Printf("wrote %d\n",nwrote)
+			for i := 0x0; i < 0xffff; i++ {
+				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(wptr.Fd()), uintptr(i), uintptr(0))
+				if errno == 0 {
+					fmt.Printf("IOCTL WORKED %x\n",i)
 				}
-				wptr.Close()
 			}
+			wptr.Close()
 		}
 	}
 	//time.Sleep(10 * time.Second)
@@ -104,11 +82,12 @@ func main(){
 	var wg sync.WaitGroup
 	rand.Seed(0x41)
 	filepath.WalkDir("/dev",visitCallback)
-	filepath.WalkDir("/sys",visitCallback)
+	//filepath.WalkDir("/sys",visitCallback)
 	fmt.Println("[+] Done Gathering Targets ")
-	for id := 1; id < 2; id++ {
+	for id := 1; id < 10; id++ {
 		wg.Add(1)
 		go loop(id, &wg)
 	}
 	wg.Wait()
+	fmt.Println("Done")
 }
