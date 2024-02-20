@@ -47,11 +47,11 @@ func loop(id int, wg *sync.WaitGroup){
 		readCount := rand.Intn(len(Buffer))
 		writeCount := rand.Intn(len(Buffer))
 		target := Targets[index]
-		fmt.Printf("[+] FUZZING %s\n",target.Name)
+		fmt.Printf("[%d] FUZZING %s\n",id,target.Name)
 		rptr, err := os.OpenFile(target.Name, os.O_RDONLY,0)
 		if err == nil {
 			rptr.Read(Buffer[0:readCount])
-			for i := 0x0; i < 0xffff; i++ {
+			for i := 0x0; i < 0xffffffff; i++ {
 				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(rptr.Fd()), uintptr(i), uintptr(0))
 				if errno == 0 {
 					//fmt.Printf("IOCTL WORKED %x\n",i)
@@ -62,7 +62,7 @@ func loop(id int, wg *sync.WaitGroup){
 		wptr, err := os.OpenFile(target.Name, os.O_WRONLY,0)
 		if err == nil {
 			wptr.Write(Buffer[0:writeCount])
-			for i := 0x0; i < 0xffff; i++ {
+			for i := 0x0; i < 0xffffffff; i++ {
 				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(wptr.Fd()), uintptr(i), uintptr(0))
 				if errno == 0 {
 					//fmt.Printf("IOCTL WORKED %x\n",i)
@@ -83,7 +83,7 @@ func main(){
 	filepath.WalkDir("/dev",visitCallback)
 	filepath.WalkDir("/sys",visitCallback)
 	fmt.Println("[+] Done Gathering Targets ")
-	for id := 1; id < 10; id++ {
+	for id := 1; id < 25; id++ {
 		wg.Add(1)
 		go loop(id, &wg)
 	}
