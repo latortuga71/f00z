@@ -42,8 +42,8 @@ func visitCallback(path string, d fs.DirEntry, err error) error {
 
 func loop(id int, wg *sync.WaitGroup){
 	//fmt.Println("Worker Start ",id)
-	for x := 0; x < len(Targets); x++ {
-		index := x
+	for {
+		index := rand.Intn(len(Targets))
 		readCount := rand.Intn(len(Buffer))
 		writeCount := rand.Intn(len(Buffer))
 		target := Targets[index]
@@ -54,7 +54,7 @@ func loop(id int, wg *sync.WaitGroup){
 			for i := 0x0; i < 0xffff; i++ {
 				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(rptr.Fd()), uintptr(i), uintptr(0))
 				if errno == 0 {
-					fmt.Printf("IOCTL WORKED %x\n",i)
+					//fmt.Printf("IOCTL WORKED %x\n",i)
 				}
 			}
 			rptr.Close()
@@ -65,7 +65,7 @@ func loop(id int, wg *sync.WaitGroup){
 			for i := 0x0; i < 0xffff; i++ {
 				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(wptr.Fd()), uintptr(i), uintptr(0))
 				if errno == 0 {
-					fmt.Printf("IOCTL WORKED %x\n",i)
+					//fmt.Printf("IOCTL WORKED %x\n",i)
 				}
 			}
 			wptr.Close()
@@ -83,7 +83,7 @@ func main(){
 	filepath.WalkDir("/dev",visitCallback)
 	filepath.WalkDir("/sys",visitCallback)
 	fmt.Println("[+] Done Gathering Targets ")
-	for id := 1; id < 2; id++ {
+	for id := 1; id < 10; id++ {
 		wg.Add(1)
 		go loop(id, &wg)
 	}
