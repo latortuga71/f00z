@@ -35,6 +35,12 @@ func visitCallback(path string, d fs.DirEntry, err error) error {
 	if strings.HasPrefix(path,"/dev/tty"){
 		return fs.SkipDir
 	}
+	if strings.HasPrefix(path,"/dev/snd/midi"){
+		return fs.SkipDir
+	}
+	if strings.HasPrefix(path,"/dev/char"){
+		return fs.SkipDir
+	}
 	if !d.IsDir() {
 		entry := FileEntry{Name:path}
 		Targets = append(Targets,entry)
@@ -100,14 +106,14 @@ func main(){
 		panic(err)
 	}*/
 	var wg sync.WaitGroup
-	rand.Seed(0x41)
+	rand.Seed(0x71)
 	filepath.WalkDir("/dev",visitCallback)
 	filepath.WalkDir("/sys",visitCallback)
 	fmt.Println("[+] Done Gathering Targets ")
 	//pprof.StartCPUProfile(f)
 	//defer pprof.StopCPUProfile()
 	//test()
-	for id := 1; id < 2; id++ {
+	for id := 1; id < 5; id++ {
 		wg.Add(1)
 		go loop(id, &wg)
 	}
