@@ -1,2 +1,4 @@
 build:
-	go build . && ./f00z
+	go build .
+run:
+	time ./f00z
